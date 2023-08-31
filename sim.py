@@ -6,24 +6,21 @@ DEBUG = False
 
 
 class Player:
-    def __init__(self, dice_pool :int, number :int):
+    def __init__(self, dice_pool: int, number: int):
         self.dice_pool = dice_pool
         self.number = number
         self.rolled = ["⬜" * self.dice_pool]
         self.bamboos = 0
         self.pandas = 0
         self.waters = 0
-        self.stats = {"bamboos": 0, "pandas": 0, "waters": 0}
+        self.roll_stats = {"bamboos": 0, "pandas": 0, "waters": 0, "blanks": 0}
 
     def roll(self):
         D = Dice()
         self.rolled = []
         for i in range(self.dice_pool):
             self.rolled.append(D.roll())
-        self.bamboos = self.rolled.count("🎋")
-        #     self.stats[]
-        self.pandas = self.rolled.count("🐼")
-        self.waters = self.rolled.count("💧")
+        self.update_stats(self.rolled)
 
     def add_dice(self, num: int):
         self.dice_pool += num
@@ -36,6 +33,15 @@ class Player:
         self.dice_pool -= num
         if self.dice_pool < 0:
             self.dice_pool = 0
+
+    def update_stats(self, rolled_dice: List[str]):
+        self.bamboos = rolled_dice.count("🎋")
+        self.roll_stats["bamboos"] += self.bamboos
+        self.pandas = rolled_dice.count("🐼")
+        self.roll_stats["pandas"] += self.pandas
+        self.waters = rolled_dice.count("💧")
+        self.roll_stats["waters"] += self.waters
+        self.roll_stats["blanks"] += rolled_dice.count("⬜")
 
 
 class Dice:
@@ -63,15 +69,14 @@ class Dice:
 
 
 class Game:
-    players: List[Player] = []
-    lowest: Player = Player(6, -1)
-    round: int = 0
-    finished: bool = False
-    winner: int = -1
-
-    def __init__(self, n):
+    def __init__(self, n: int, print_rounds: bool):
+        self.players: List[Player] = []
+        self.lowest: Player = Player(6, -1)
+        self.round: int = 0
+        self.finished: bool = False
+        self.winner: int = -1
+        self.print_rounds = print_rounds
         self.nPlayers = n
-        self.remaining = n
         if n < 4:
             dice = 6
         elif n == 4:
@@ -97,10 +102,11 @@ class Game:
             if winner is not None:
                 print(f"The winner is player number {winner.number}")
                 self.finished = True
+                self.winner = winner
                 return
         self.round += 1
 
-    def check_winner(self, current, previous):
+    def check_winner(self, current: Player, previous: Player) -> Player:
         if self.lowest.dice_pool > 0:
             return None
 
@@ -110,9 +116,7 @@ class Game:
             return current
 
     def update_dice(self, player: Player, style: str = "lowest"):
-        # print(player.dice_pool, "".join(player.rolled))
         player.remove_dice(player.waters, Dice.get_icon("water"))
-        # print(player.dice_pool, "".join(player.rolled))
 
         if self.lowest.dice_pool == 0:
             self.lowest.add_dice(player.pandas)
@@ -120,7 +124,6 @@ class Game:
             p = self.pick_player(player)
             p.add_dice(player.pandas)
         player.remove_dice(player.pandas, Dice.get_icon("panda"))
-        # print(player.dice_pool, "".join(player.rolled))
 
     def update_lowest(self) -> None:
         self.lowest = min(self.players, key=attrgetter("dice_pool"))
@@ -132,7 +135,6 @@ class Game:
                 print(f"{previous.number} gave {delta} dice to {current.number}")
             current.add_dice(delta)
             previous.remove_dice(delta, Dice.get_icon("bamboo"))
-            # print(current.dice_pool, "".join(current.rolled))
 
     def pick_player(self, player) -> Player:
         i = random.randint(0, self.nPlayers - 1)
@@ -146,14 +148,30 @@ class Game:
         for p in self.players:
             format_string += "{:^15}"
             row.append("".join(p.rolled))
-        # print(row)
-        print(format_string.format(*row))
+        if self.print_rounds:
+            print(format_string.format(*row))
+
+
+class Simulation:
+    def __init__(self, n_players: int, n_games: int) -> None:
+        self.n_players = n_players
+        self.n_games = n_games
+        self.log = []
+        self.winner_count = [0] * n_players
+
+    def simulate(self):
+        for i in range(self.n_games):
+            G = Game(self.n_players, False)
+            while not G.finished:
+                G.play_round()
+            self.log.append([G.winner.number, G.round])
+            self.winner_count[G.winner.number] += 1
 
 
 def main():
-    G = Game(3)
-    while not G.finished:
-        G.play_round()
+    Sim = Simulation(6, 10000)
+    Sim.simulate()
+    print(Sim.winner_count)
 
 
 if __name__ == "__main__":
